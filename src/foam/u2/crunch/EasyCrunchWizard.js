@@ -73,9 +73,9 @@ foam.CLASS({
     },
     {
       class: 'Boolean',
-      name: 'disableGrantedEdit',
+      name: 'preventApprovableCreation',
       documentation: `
-        Set to true to disabled the generation of Approvables when updating a
+        Set to true to disabled the creation of Approvables when updating a
         granted UCJ.
       `
     }
@@ -98,7 +98,7 @@ foam.CLASS({
           mode: this.skipMode });
       if ( this.statelessWizard )
         sequence.remove('WizardStateAgent');
-      if ( this.disableGrantedEdit )
+      if ( this.preventApprovableCreation )
         sequence.remove('GrantedEditAgent');
     },
     async function execute () {
