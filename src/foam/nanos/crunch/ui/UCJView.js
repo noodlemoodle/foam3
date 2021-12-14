@@ -87,6 +87,8 @@ foam.CLASS({
       sequence
         .reconfigure('LoadCapabilitiesAgent', {
           subject: subject })
+        .reconfigure('GrantedEditAgent', {
+          subject: subject })
         .reconfigure('ConfigureFlowAgent', {
           popupMode: false
         })
