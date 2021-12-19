@@ -296,13 +296,13 @@ public interface FObject
   }
 
   default FObject copyFrom(FObject obj) {
-    List<PropertyInfo> props = getClassInfo().getAxiomsByClass(PropertyInfo.class);
+    List<PropertyInfo> props = obj.getClassInfo().getAxiomsByClass(PropertyInfo.class);
     for ( PropertyInfo p : props ) {
       try {
         if ( p.isSet(obj) ) p.set(this, p.get(obj));
       } catch (ClassCastException e) {
         try {
-          PropertyInfo p2 = (PropertyInfo) obj.getClassInfo().getAxiomByName(p.getName());
+          PropertyInfo p2 = (PropertyInfo) getClassInfo().getAxiomByName(p.getName());
           if ( p2 != null ) {
             if ( p2.isSet(obj) ) p.set(this, p2.get(obj));
           }
