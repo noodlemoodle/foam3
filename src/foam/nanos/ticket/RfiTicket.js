@@ -21,6 +21,20 @@ foam.CLASS({
 
   properties: [
     {
+      name: 'statusChoices',
+      hidden: true,
+      factory: function() {
+        var s = [];
+        s.push(this.status);
+        if ( this.status == 'OPEN' ) {
+          s.push('EXPIRED');
+          s.push('CLOSED');
+        }
+        return s;
+      },
+      documentation: 'Returns available statuses for each ticket depending on current status'
+    },
+    {
       name: 'type',
       value: 'Request for information',
       section: 'infoSection'
