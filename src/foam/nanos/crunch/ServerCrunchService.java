@@ -547,12 +547,9 @@ public class ServerCrunchService extends ContextAwareSupport implements CrunchSe
     var pm = PM.create(x, ServerCrunchService.class.getSimpleName(), "updateJunction");
 
     try {
-      var pm1 = PM.create(x, ServerCrunchService.class.getSimpleName(), "updateJunction1");
       Subject subject = (Subject) x.get("subject");
       UserCapabilityJunction ucj = this.getJunction(x, capabilityId);
-      pm1.log(x);
 
-      var pm2 = PM.create(x, ServerCrunchService.class.getSimpleName(), "updateJunction2");
       if ( ucj.getStatus() == AVAILABLE && status == null ) {
         ucj.setStatus(ACTION_REQUIRED);
       }
@@ -563,24 +560,17 @@ public class ServerCrunchService extends ContextAwareSupport implements CrunchSe
       if ( status != null ) {
         ucj.setStatus(status);
       }
-      pm2.log(x);
 
-      var pm3 = PM.create(x, ServerCrunchService.class.getSimpleName(), "updateJunction3");
       AuthService auth = (AuthService) x.get("auth");
       if ( subject.getRealUser() != subject.getUser() && auth.check(x, "usercapabilityjunction.warn.update") ) {
         var logger = (Logger) x.get("logger");
         // This may be correct when testing features as an admin user
         logger.warning(subject.getUser().toSummary() + " user is lastUpdatedRealUser on an agent-associated UCJ");
       }
-      pm3.log(x);
-      var pm4 = PM.create(x, ServerCrunchService.class.getSimpleName(), "updateJunction4");
-      try {
-        ucj.setLastUpdatedRealUser(subject.getRealUser().getId());
-        DAO userCapabilityJunctionDAO = (DAO) x.get("userCapabilityJunctionDAO");
-        return (UserCapabilityJunction) userCapabilityJunctionDAO.inX(x).put(ucj);
-      } finally {
-        pm4.log(x);
-      }
+
+      ucj.setLastUpdatedRealUser(subject.getRealUser().getId());
+      DAO userCapabilityJunctionDAO = (DAO) x.get("userCapabilityJunctionDAO");
+      return (UserCapabilityJunction) userCapabilityJunctionDAO.inX(x).put(ucj);
     } finally {
       pm.log(x);
     }
