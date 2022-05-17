@@ -18,11 +18,9 @@ import foam.mlang.sink.GroupBy;
 import foam.nanos.NanoService;
 import foam.nanos.approval.Approvable;
 import foam.nanos.approval.ApprovalRequest;
-import foam.nanos.approval.CompositeApprovable;
 import foam.nanos.auth.Subject;
 import foam.nanos.auth.User;
 import foam.nanos.auth.AuthService;
-import foam.nanos.crunch.UCJUpdateApprovable;
 import foam.nanos.crunch.ui.PrerequisiteAwareWizardlet;
 import foam.nanos.crunch.ui.WizardState;
 import foam.nanos.dao.Operation;
@@ -49,14 +47,21 @@ public class ServerCrunchService extends ContextAwareSupport implements CrunchSe
 
   //TODO: Needs to be refactored once Subject is serializable
   public List getCapabilityPathFor(X x, String rootId, boolean filterGrantedUCJ, User effectiveUser, User user) {
-    foam.nanos.auth.AuthService auth = (foam.nanos.auth.AuthService) x.get("auth");
-    if ( auth.check(x, "service.crunchService.getCapabilityPathFor") ) {
-      var requestedSubject = new Subject();
-      requestedSubject.setUser(user);
-      requestedSubject.setUser(effectiveUser);
-      x = x.put("subject", requestedSubject);
+    var pm = PM.create(x, ServerCrunchService.class.getSimpleName(), "getCapabilityPathFor");
+
+    try {
+      foam.nanos.auth.AuthService auth = (foam.nanos.auth.AuthService) x.get("auth");
+      if ( auth.check(x, "service.crunchService.getCapabilityPathFor") ) {
+        var requestedSubject = new Subject();
+        requestedSubject.setUser(user);
+        requestedSubject.setUser(effectiveUser);
+        x = x.put("subject", requestedSubject);
+      }
+
+      return this.getCapabilityPath(x, rootId, filterGrantedUCJ, true);
+    } finally {
+      pm.log(x);
     }
-    return this.getCapabilityPath(x, rootId, filterGrantedUCJ, true);
   }
 
   public List getCapabilityPath(X x, String rootId, boolean filterGrantedUCJ, boolean groupPrereqAwares) {
@@ -64,8 +69,9 @@ public class ServerCrunchService extends ContextAwareSupport implements CrunchSe
   }
 
   public List retrieveCapabilityPath(X x, String rootId, boolean filterGrantedUCJ, boolean groupPrereqAwares, List collectLeafNodesList) {
+    var pm = PM.create(x, ServerCrunchService.class.getSimpleName(), "retrieveCapabilityPath");
+
     Logger logger = (Logger) x.get("logger");
-    PM pm = PM.create(x, this.getClass().getSimpleName(), "getCapabilityPath");
 
     DAO capabilityDAO = (DAO) x.get("capabilityDAO");
 
@@ -110,12 +116,12 @@ public class ServerCrunchService extends ContextAwareSupport implements CrunchSe
       alreadyListed.add(sourceCapabilityId);
       var prereqsList = getPrereqs(x, sourceCapabilityId, null);
       var prereqs = prereqsList == null ? new String[0] : prereqsList.stream()
-          .filter(c -> ! alreadyListed.contains(c))
-          .toArray(String[]::new);
+        .filter(c -> ! alreadyListed.contains(c))
+        .toArray(String[]::new);
 
       var prereqAware = cap.getWizardlet() instanceof PrerequisiteAwareWizardlet || (
         cap.getBeforeWizardlet() != null &&
-        cap.getBeforeWizardlet() instanceof PrerequisiteAwareWizardlet
+          cap.getBeforeWizardlet() instanceof PrerequisiteAwareWizardlet
       );
       if ( groupPrereqAwares && prereqAware && ! rootId.equals(sourceCapabilityId) ) {
         List minMaxArray = new ArrayList<>();
@@ -138,14 +144,14 @@ public class ServerCrunchService extends ContextAwareSupport implements CrunchSe
         }
 
         /**
-            Format of a min max for getGrantPath
-            [[prereqsChoiceA, choiceA], [prereqsChoiceB,choiceB], minMaxCapa]
+         Format of a min max for getGrantPath
+         [[prereqsChoiceA, choiceA], [prereqsChoiceB,choiceB], minMaxCapa]
          */
         minMaxArray.add(cap);
 
         /**
-            Format of a min max for getGrantPath as a prereq for another  capability
-            [[[prereqsChoiceA, choiceA], [prereqsChoiceB,choiceB], minMaxCap],cap]
+         Format of a min max for getGrantPath as a prereq for another  capability
+         [[[prereqsChoiceA, choiceA], [prereqsChoiceB,choiceB], minMaxCap],cap]
          */
         grantPath.add(minMaxArray);
 
@@ -183,32 +189,47 @@ public class ServerCrunchService extends ContextAwareSupport implements CrunchSe
       Collections.reverse(collectLeafNodesList);
     }
     Collections.reverse(grantPath);
+
     pm.log(x);
+
     return grantPath;
   }
 
   public String[] getDependentIds(X x, String capabilityId) {
-    return Arrays.stream(((CapabilityCapabilityJunction[]) ((ArraySink) ((DAO) x.get("prerequisiteCapabilityJunctionDAO"))
-      .inX(x)
-      .where(EQ(CapabilityCapabilityJunction.TARGET_ID, capabilityId))
-      .select(new ArraySink())).getArray()
-      .toArray(new CapabilityCapabilityJunction[0])))
-      .map(CapabilityCapabilityJunction::getSourceId).toArray(String[]::new);
+    var pm = PM.create(x, ServerCrunchService.class.getSimpleName(), "getDependentIds");
+
+    try {
+      return Arrays.stream(((CapabilityCapabilityJunction[]) ((ArraySink) ((DAO) x.get("prerequisiteCapabilityJunctionDAO"))
+          .inX(x)
+          .where(EQ(CapabilityCapabilityJunction.TARGET_ID, capabilityId))
+          .select(new ArraySink())).getArray()
+          .toArray(new CapabilityCapabilityJunction[0])))
+        .map(CapabilityCapabilityJunction::getSourceId).toArray(String[]::new);
+    } finally {
+      pm.log(x);
+    }
   }
 
   // gets prereq list of a cap from the prereqsCache_
   // if cache returned is null, try to find prereqs directly from prerequisitecapabilityjunctiondao
   public List<String> getPrereqs(X x, String capId, UserCapabilityJunction ucj) {
-    if ( ucj != null ) x = x.put("subject", ucj.getSubject(x));
-    Map<String, List<String>> prereqsCache_ = getPrereqsCache(x);
-    if ( prereqsCache_ != null ) return prereqsCache_.get(capId);
+    var pm = PM.create(x, ServerCrunchService.class.getSimpleName(), "getPrereqs");
 
-    return getPrereqs_(x, capId);
+    try {
+      if ( ucj != null ) x = x.put("subject", ucj.getSubject(x));
+      Map<String, List<String>> prereqsCache_ = getPrereqsCache(x);
+      if ( prereqsCache_ != null ) return prereqsCache_.get(capId);
+
+      return getPrereqs_(x, capId);
+    } finally {
+      pm.log(x);
+    }
   }
 
   // select all ccjs from pcjdao and put them into map of <src, [tgt]> pairs
   // then the map is stored in the session context under CACHE_KEY
   public Map initCache(X x, boolean cache) {
+    var pm = PM.create(x, ServerCrunchService.class.getSimpleName(), "initCache");
 
     if ( cache ) {
       Sink purgeSink = new Sink() {
@@ -249,21 +270,31 @@ public class ServerCrunchService extends ContextAwareSupport implements CrunchSe
       session.setContext(session.getContext().put(CACHE_KEY, map));
     }
 
+    pm.log(x);
+
     return map;
   }
 
   // returns a getPrereqs result directly from prerequisitecapabilityjunctiondao
   public List<String> getPrereqs_(X x, String capId) {
-    return ((ArraySink) ((foam.mlang.sink.Map) ((DAO) x.get("prerequisiteCapabilityJunctionDAO"))
-      .inX(x)
-      .where(EQ(CapabilityCapabilityJunction.SOURCE_ID, capId))
-      .orderBy(CapabilityCapabilityJunction.PRIORITY)
-      .select(MAP(CapabilityCapabilityJunction.TARGET_ID, new ArraySink()))).getDelegate())
-      .getArray();
+    var pm = PM.create(x, ServerCrunchService.class.getSimpleName(), "getPrereqs_");
+
+    try {
+      return ((ArraySink) ((foam.mlang.sink.Map) ((DAO) x.get("prerequisiteCapabilityJunctionDAO"))
+        .inX(x)
+        .where(EQ(CapabilityCapabilityJunction.SOURCE_ID, capId))
+        .orderBy(CapabilityCapabilityJunction.PRIORITY)
+        .select(MAP(CapabilityCapabilityJunction.TARGET_ID, new ArraySink()))).getDelegate())
+        .getArray();
+    } finally {
+      pm.log(x);
+    }
   }
 
   // when an entry of ccj is added, updated, or removed from pcjdao, update corresponding entry in the cache
   public void updateEntry(X x, CapabilityCapabilityJunction ccj) {
+    var pm = PM.create(x, ServerCrunchService.class.getSimpleName(), "updateEntry");
+
     Session session = x.get(Session.class);
     if ( session == null ) return;
     // use the context of the session user/agent to recalculate the prereqs list for corresponding
@@ -279,14 +310,20 @@ public class ServerCrunchService extends ContextAwareSupport implements CrunchSe
     cache.put(ccj.getSourceId(), getPrereqs_(x.put("subject", subject), ccj.getSourceId()));
 
     session.setContext(session.getContext().put(CACHE_KEY, cache));
+
+    pm.log(x);
   }
 
   // sets the prerequisite cache to null, is used when session info changes
   public static void purgeCache(X x) {
+    var pm = PM.create(x, ServerCrunchService.class.getSimpleName(), "purgeCache");
+
     Session session = x.get(Session.class);
     if ( session != null ){
       session.setContext(session.getContext().put(CACHE_KEY, null));
     }
+
+    pm.log(x);
   }
 
 
@@ -295,6 +332,8 @@ public class ServerCrunchService extends ContextAwareSupport implements CrunchSe
   // otherwise, return the result of directly looking up prerequisitecapabilityjunctiondao since
   // the cache is not valid
   protected Map<String, List<String>> getPrereqsCache(X x) {
+    var pm = PM.create(x, ServerCrunchService.class.getSimpleName(), "getPrereqsCache");
+
     Session session = x.get(Session.class);
     User user = ((Subject) x.get("subject")).getUser();
     if ( user == null || session == null ) {
@@ -312,20 +351,29 @@ public class ServerCrunchService extends ContextAwareSupport implements CrunchSe
     if ( ! cacheValid ) return null;
 
     Map<String, List<String>> map = (Map) session.getContext().get(CACHE_KEY);
+
+    pm.log(x);
+
     return map == null ? initCache(x, true) : map;
   }
 
   //TODO: Needs to be refactored once Subject is serializable
   public UserCapabilityJunction getJunctionFor(X x, String capabilityId, User effectiveUser, User user) {
-    Subject subject = (Subject) x.get("subject");
-    foam.nanos.auth.AuthService auth = (foam.nanos.auth.AuthService) x.get("auth");
-    if ( auth.check(x, "service.crunchService.getJunctionFor") ) {
-      var requestedSubject = new Subject();
-      requestedSubject.setUser(user);
-      requestedSubject.setUser(effectiveUser);
-      return this.getJunctionForSubject(x, capabilityId, requestedSubject);
+    var pm = PM.create(x, ServerCrunchService.class.getSimpleName(), "getJunctionFor");
+
+    try {
+      Subject subject = (Subject) x.get("subject");
+      foam.nanos.auth.AuthService auth = (foam.nanos.auth.AuthService) x.get("auth");
+      if ( auth.check(x, "service.crunchService.getJunctionFor") ) {
+        var requestedSubject = new Subject();
+        requestedSubject.setUser(user);
+        requestedSubject.setUser(effectiveUser);
+        return this.getJunctionForSubject(x, capabilityId, requestedSubject);
+      }
+      return this.getJunctionForSubject(x, capabilityId, subject);
+    } finally {
+      pm.log(x);
     }
-    return this.getJunctionForSubject(x, capabilityId, subject);
   }
 
   public UserCapabilityJunction getJunction(X x, String capabilityId) {
@@ -334,16 +382,18 @@ public class ServerCrunchService extends ContextAwareSupport implements CrunchSe
   }
 
   public boolean atLeastOneInCategory(X x, String category) {
+    var pm = PM.create(x, ServerCrunchService.class.getSimpleName(), "atLeastOneInCategory");
+
     var categoryJunctionDAO = (DAO) x.get("capabilityCategoryCapabilityJunctionDAO");
 
     var junctions = new ArrayList<>();
     categoryJunctionDAO.where(EQ(CapabilityCategoryCapabilityJunction.SOURCE_ID, category))
-    .select(new AbstractSink() {
-      @Override
-      public void put(Object obj, Detachable sub) {
-        junctions.add(((CapabilityCategoryCapabilityJunction) obj).getTargetId());
-      }
-    });
+      .select(new AbstractSink() {
+        @Override
+        public void put(Object obj, Detachable sub) {
+          junctions.add(((CapabilityCategoryCapabilityJunction) obj).getTargetId());
+        }
+      });
 
     var ucj = (UserCapabilityJunction) ((DAO) x.get("userCapabilityJunctionDAO"))
       .find(AND(
@@ -353,40 +403,48 @@ public class ServerCrunchService extends ContextAwareSupport implements CrunchSe
         )
       );
 
+    pm.log(x);
+
     return ucj != null;
   }
 
   // see documentation in CrunchService interface
-  public boolean hasPreconditionsMet(
-    X sessionX, String capabilityId
-  ) {
-    // Return false if capability does not exist or is not available
-    var capabilityDAO = ((DAO) sessionX.get("capabilityDAO")).inX(sessionX);
-    if ( capabilityDAO.find(capabilityId) == null ) return false;
+  public boolean hasPreconditionsMet(X sessionX, String capabilityId) {
+    var pm = PM.create(getX(), ServerCrunchService.class.getSimpleName(), "hasPreconditionsMet");
 
-    // TODO: use MapSink to simplify/optimize this code
-    var preconditions = Arrays.stream(((CapabilityCapabilityJunction[]) ((ArraySink) ((DAO) sessionX.get("prerequisiteCapabilityJunctionDAO"))
-      .inX(sessionX)
-      .where(AND(
-        EQ(CapabilityCapabilityJunction.SOURCE_ID, capabilityId),
-        EQ(CapabilityCapabilityJunction.PRECONDITION, true)
-      ))
-      .select(new ArraySink())).getArray()
-      .toArray(new CapabilityCapabilityJunction[0])))
-      .map(CapabilityCapabilityJunction::getTargetId).toArray(String[]::new);
-
-    for ( String preconditionId : preconditions ) {
+    try {
       // Return false if capability does not exist or is not available
-      if ( capabilityDAO.find(preconditionId) == null ) return false;
-      var ucj = getJunction(sessionX, preconditionId);
-      if ( ucj.getStatus() != CapabilityJunctionStatus.GRANTED ) return false;
-    }
+      var capabilityDAO = ((DAO) sessionX.get("capabilityDAO")).inX(sessionX);
+      if ( capabilityDAO.find(capabilityId) == null ) return false;
 
-    return true;
+      // TODO: use MapSink to simplify/optimize this code
+      var preconditions = Arrays.stream(((CapabilityCapabilityJunction[]) ((ArraySink) ((DAO) sessionX.get("prerequisiteCapabilityJunctionDAO"))
+          .inX(sessionX)
+          .where(AND(
+            EQ(CapabilityCapabilityJunction.SOURCE_ID, capabilityId),
+            EQ(CapabilityCapabilityJunction.PRECONDITION, true)
+          ))
+          .select(new ArraySink())).getArray()
+          .toArray(new CapabilityCapabilityJunction[0])))
+        .map(CapabilityCapabilityJunction::getTargetId).toArray(String[]::new);
+
+      for ( String preconditionId : preconditions ) {
+        // Return false if capability does not exist or is not available
+        if ( capabilityDAO.find(preconditionId) == null ) return false;
+        var ucj = getJunction(sessionX, preconditionId);
+        if ( ucj.getStatus() != CapabilityJunctionStatus.GRANTED ) return false;
+      }
+
+      return true;
+    } finally {
+      pm.log(getX());
+    }
   }
 
   // see documentation in CrunchService interface
   public ArraySink getEntryCapabilities(X x) {
+    var pm = PM.create(x, ServerCrunchService.class.getSimpleName(), "getEntryCapabilities");
+
     var sink = new ArraySink();
     var proxySink = new ProxySink(x, sink) {
       @Override
@@ -401,21 +459,30 @@ public class ServerCrunchService extends ContextAwareSupport implements CrunchSe
 
     var capabilityDAO = ((DAO) x.get("capabilityDAO")).inX(x);
     capabilityDAO.select(proxySink);
+
+    pm.log(x);
+
     return sink;
   }
 
   public UserCapabilityJunction[] getAllJunctionsForUser(X x) {
-    Predicate associationPredicate = getAssociationPredicate_(x, null);
-    DAO userCapabilityJunctionDAO = (DAO) x.get("userCapabilityJunctionDAO");
-    ArraySink arraySink = (ArraySink) userCapabilityJunctionDAO
-      .where(associationPredicate)
-      .select(new ArraySink());
-    return (UserCapabilityJunction[]) arraySink.getArray().toArray(new UserCapabilityJunction[0]);
+    var pm = PM.create(x, ServerCrunchService.class.getSimpleName(), "getAllJunctionsForUser");
+
+    try {
+      Predicate associationPredicate = getAssociationPredicate_(x, null);
+      DAO userCapabilityJunctionDAO = (DAO) x.get("userCapabilityJunctionDAO");
+      ArraySink arraySink = (ArraySink) userCapabilityJunctionDAO
+        .where(associationPredicate)
+        .select(new ArraySink());
+      return (UserCapabilityJunction[]) arraySink.getArray().toArray(new UserCapabilityJunction[0]);
+    } finally {
+      pm.log(x);
+    }
   }
 
-  public UserCapabilityJunction getJunctionForSubject(
-    X x, String capabilityId,  Subject subject
-  ) {
+  public UserCapabilityJunction getJunctionForSubject(X x, String capabilityId, Subject subject) {
+    var pm = PM.create(x, ServerCrunchService.class.getSimpleName(), "getJunctionForSubject");
+
     Predicate targetPredicate = EQ(UserCapabilityJunction.TARGET_ID, capabilityId);
     try {
       DAO userCapabilityJunctionDAO = (DAO) x.get("userCapabilityJunctionDAO");
@@ -440,172 +507,204 @@ public class ServerCrunchService extends ContextAwareSupport implements CrunchSe
       // On failure, report that the capability is available
       var ucj = buildAssociatedUCJ(x, capabilityId, subject);
       return ucj;
+    } finally {
+      pm.log(x);
     }
   }
 
   public UserCapabilityJunction updateJunctionDirectly(X x, String capabilityId, FObject data) {
-    Subject subject = (Subject) x.get("subject");
-    UserCapabilityJunction ucj = this.getJunction(x, capabilityId);
+    var pm = PM.create(x, ServerCrunchService.class.getSimpleName(), "updateJunctionDirectly");
 
-    if ( ucj.getStatus() == AVAILABLE ) {
-      ucj.setStatus(ACTION_REQUIRED);
-    }
+    try {
+      Subject subject = (Subject) x.get("subject");
+      UserCapabilityJunction ucj = this.getJunction(x, capabilityId);
 
-    if ( data != null ) {
-      // Use existing data if it exists
-      FObject existingData = ucj.getData();
-      if ( existingData != null ) {
-        existingData.copyFrom(data);
-        data = existingData;
+      if ( ucj.getStatus() == AVAILABLE ) {
+        ucj.setStatus(ACTION_REQUIRED);
       }
 
-      ucj.setData(data);
+      if ( data != null ) {
+        // Use existing data if it exists
+        FObject existingData = ucj.getData();
+        if ( existingData != null ) {
+          existingData.copyFrom(data);
+          data = existingData;
+        }
+
+        ucj.setData(data);
+      }
+
+      ucj.setLastUpdatedRealUser(subject.getRealUser().getId());
+
+      DAO bareUserCapabilityJunctionDAO = (DAO) x.get("bareUserCapabilityJunctionDAO");
+      return (UserCapabilityJunction) bareUserCapabilityJunctionDAO.inX(x).put(ucj);
+    } finally {
+      pm.log(x);
     }
-
-    ucj.setLastUpdatedRealUser(subject.getRealUser().getId());
-
-    DAO bareUserCapabilityJunctionDAO = (DAO) x.get("bareUserCapabilityJunctionDAO");
-    return (UserCapabilityJunction) bareUserCapabilityJunctionDAO.inX(x).put(ucj);
   }
 
-  public UserCapabilityJunction updateJunction(
-    X x, String capabilityId, FObject data,
-    CapabilityJunctionStatus status
-  ) {
-    Subject subject = (Subject) x.get("subject");
-    UserCapabilityJunction ucj = this.getJunction(x, capabilityId);
+  public UserCapabilityJunction updateJunction(X x, String capabilityId, FObject data, CapabilityJunctionStatus status) {
+    var pm = PM.create(x, ServerCrunchService.class.getSimpleName(), "updateJunction");
 
-    if ( ucj.getStatus() == AVAILABLE && status == null ) {
-      ucj.setStatus(ACTION_REQUIRED);
-    }
+    try {
+      var pm1 = PM.create(x, ServerCrunchService.class.getSimpleName(), "updateJunction1");
+      Subject subject = (Subject) x.get("subject");
+      UserCapabilityJunction ucj = this.getJunction(x, capabilityId);
+      pm1.log(x);
 
-    if ( data != null ) {
-      ucj.setData(data);
-    }
-    if ( status != null ) {
-      ucj.setStatus(status);
-    }
+      var pm2 = PM.create(x, ServerCrunchService.class.getSimpleName(), "updateJunction2");
+      if ( ucj.getStatus() == AVAILABLE && status == null ) {
+        ucj.setStatus(ACTION_REQUIRED);
+      }
 
-    AuthService auth = (AuthService) x.get("auth");
-    if (
-      auth.check(x, "usercapabilityjunction.warn.update")
-      && subject.getRealUser() != subject.getUser()
-    ) {
-      var logger = (Logger) x.get("logger");
-      // This may be correct when testing features as an admin user
-      logger.warning(
-        subject.getUser().toSummary() + " user is lastUpdatedRealUser on an agent-associated UCJ");
+      if ( data != null ) {
+        ucj.setData(data);
+      }
+      if ( status != null ) {
+        ucj.setStatus(status);
+      }
+      pm2.log(x);
+
+      var pm3 = PM.create(x, ServerCrunchService.class.getSimpleName(), "updateJunction3");
+      AuthService auth = (AuthService) x.get("auth");
+      if ( subject.getRealUser() != subject.getUser() && auth.check(x, "usercapabilityjunction.warn.update") ) {
+        var logger = (Logger) x.get("logger");
+        // This may be correct when testing features as an admin user
+        logger.warning(subject.getUser().toSummary() + " user is lastUpdatedRealUser on an agent-associated UCJ");
+      }
+      pm3.log(x);
+      var pm4 = PM.create(x, ServerCrunchService.class.getSimpleName(), "updateJunction4");
+      try {
+        ucj.setLastUpdatedRealUser(subject.getRealUser().getId());
+        DAO userCapabilityJunctionDAO = (DAO) x.get("userCapabilityJunctionDAO");
+        return (UserCapabilityJunction) userCapabilityJunctionDAO.inX(x).put(ucj);
+      } finally {
+        pm4.log(x);
+      }
+    } finally {
+      pm.log(x);
     }
-    ucj.setLastUpdatedRealUser(subject.getRealUser().getId());
-    DAO userCapabilityJunctionDAO = (DAO) x.get("userCapabilityJunctionDAO");
-    return (UserCapabilityJunction) userCapabilityJunctionDAO.inX(x).put(ucj);
   }
 
   //TODO: Needs to be refactored once Subject is serializable
-  public UserCapabilityJunction updateJunctionFor(
-    X x, String capabilityId, FObject data,
-    CapabilityJunctionStatus status, User effectiveUser, User user
-  ) {
-    Subject subject = (Subject) x.get("subject");
-    foam.nanos.auth.AuthService auth = (foam.nanos.auth.AuthService) x.get("auth");
-    if ( auth.check(x, "service.crunchService.updateJunctionFor") ) {
-      var requestedSubject = new Subject();
-      requestedSubject.setUser(user);
-      requestedSubject.setUser(effectiveUser);
-      return this.updateUserJunction(x, requestedSubject, capabilityId, data, status);
-    }
-    return this.updateUserJunction(x, subject, capabilityId, data, status);
-  }
+  public UserCapabilityJunction updateJunctionFor(X x, String capabilityId, FObject data, CapabilityJunctionStatus status, User effectiveUser, User user) {
+    var pm = PM.create(x, ServerCrunchService.class.getSimpleName(), "updateJunctionFor");
 
-  public UserCapabilityJunction updateUserJunction(
-    X x, Subject subject, String capabilityId, FObject data,
-    CapabilityJunctionStatus status
-  ) {
-    UserCapabilityJunction ucj = this.getJunctionForSubject(
-      x, capabilityId, subject);
-
-    if ( data != null ) {
-      ucj.setData(data);
-    }
-    if ( status != null ) {
-      ucj.setStatus(status);
-    }
-
-    DAO userCapabilityJunctionDAO = (DAO) x.get("userCapabilityJunctionDAO");
-    var subjectX = x.put("subject", subject);
-    return (UserCapabilityJunction) userCapabilityJunctionDAO.inX(subjectX).put(ucj);
-  }
-
-  public UserCapabilityJunction buildAssociatedUCJ(
-    X x, String capabilityId, Subject subject
-  ) {
-    // Need Capability to associate UCJ correctly
-    DAO capabilityDAO = (DAO) x.get("capabilityDAO");
-
-    // If the subject in context doesn't have the capability availabile, we
-    // should act as though it doesn't exist; this is why inX is here.
-    Capability cap = (Capability) capabilityDAO.inX(x).find(capabilityId);
-    if ( cap == null ) {
-      throw new RuntimeException(String.format(
-        "Capability with id '%s' is either unavailabile or does not exist",
-        capabilityId
-      ));
-    }
-    AssociatedEntity associatedEntity = cap.getAssociatedEntity();
-    boolean isAssociation = associatedEntity == AssociatedEntity.ACTING_USER;
-    User associatedUser = associatedEntity == AssociatedEntity.USER
-      ? subject.getUser()
-      : subject.getRealUser()
-      ;
-    // Setup default data
-    FObject payload = null;
     try {
-      payload = cap.getOf() != null ? (FObject) cap.getOf().newInstance() : null;
-    } catch ( Exception ex ) {
-      throw new RuntimeException("UCJ payload default setup ERROR: " + ex.getMessage(), ex);
+      Subject subject = (Subject) x.get("subject");
+      foam.nanos.auth.AuthService auth = (foam.nanos.auth.AuthService) x.get("auth");
+      if ( auth.check(x, "service.crunchService.updateJunctionFor") ) {
+        var requestedSubject = new Subject();
+        requestedSubject.setUser(user);
+        requestedSubject.setUser(effectiveUser);
+        return this.updateUserJunction(x, requestedSubject, capabilityId, data, status);
+      }
+      return this.updateUserJunction(x, subject, capabilityId, data, status);
+    } finally {
+      pm.log(x);
     }
-    var ucj = isAssociation
-      ? new AgentCapabilityJunction.Builder(x)
+  }
+
+  public UserCapabilityJunction updateUserJunction(X x, Subject subject, String capabilityId, FObject data, CapabilityJunctionStatus status) {
+    var pm = PM.create(x, ServerCrunchService.class.getSimpleName(), "updateUserJunction");
+
+    try {
+      UserCapabilityJunction ucj = this.getJunctionForSubject(
+        x, capabilityId, subject);
+
+      if ( data != null ) {
+        ucj.setData(data);
+      }
+      if ( status != null ) {
+        ucj.setStatus(status);
+      }
+
+      DAO userCapabilityJunctionDAO = (DAO) x.get("userCapabilityJunctionDAO");
+      var subjectX = x.put("subject", subject);
+      return (UserCapabilityJunction) userCapabilityJunctionDAO.inX(subjectX).put(ucj);
+    } finally {
+      pm.log(x);
+    }
+  }
+
+  public UserCapabilityJunction buildAssociatedUCJ(X x, String capabilityId, Subject subject) {
+    var pm = PM.create(x, ServerCrunchService.class.getSimpleName(), "buildAssociatedUCJ");
+
+    try {
+      // Need Capability to associate UCJ correctly
+      DAO capabilityDAO = (DAO) x.get("capabilityDAO");
+
+      // If the subject in context doesn't have the capability availabile, we
+      // should act as though it doesn't exist; this is why inX is here.
+      Capability cap = (Capability) capabilityDAO.inX(x).find(capabilityId);
+      if ( cap == null ) {
+        throw new RuntimeException(String.format(
+          "Capability with id '%s' is either unavailabile or does not exist",
+          capabilityId
+        ));
+      }
+      AssociatedEntity associatedEntity = cap.getAssociatedEntity();
+      boolean isAssociation = associatedEntity == AssociatedEntity.ACTING_USER;
+      User associatedUser = associatedEntity == AssociatedEntity.USER
+        ? subject.getUser()
+        : subject.getRealUser();
+      // Setup default data
+      FObject payload = null;
+      try {
+        payload = cap.getOf() != null ? (FObject) cap.getOf().newInstance() : null;
+      } catch ( Exception ex ) {
+        throw new RuntimeException("UCJ payload default setup ERROR: " + ex.getMessage(), ex);
+      }
+      var ucj = isAssociation
+        ? new AgentCapabilityJunction.Builder(x)
         .setSourceId(associatedUser.getId())
         .setTargetId(capabilityId)
         .setEffectiveUser(subject.getUser().getId())
         .build()
-      : new UserCapabilityJunction.Builder(x)
+        : new UserCapabilityJunction.Builder(x)
         .setSourceId(associatedUser.getId())
         .setTargetId(capabilityId)
-        .build()
-      ;
-    ucj.setStatus(CapabilityJunctionStatus.AVAILABLE);
-    ucj.setData(payload);
-    return ucj;
+        .build();
+      ucj.setStatus(CapabilityJunctionStatus.AVAILABLE);
+      ucj.setData(payload);
+      return ucj;
+    } finally {
+      pm.log(x);
+    }
   }
 
   public void maybeIntercept(X x, String[] capabilityOptions) {
-    if ( capabilityOptions.length < 1 ) {
-      Logger logger = (Logger) x.get("logger");
-      logger.warning("crunchService.maybeIntercept() performed with empty list");
-      return;
-    }
+    var pm = PM.create(x, ServerCrunchService.class.getSimpleName(), "maybeIntercept");
 
-    // Check that at least one capability option is satisfied
-    boolean satisfied = false;
-    for ( String capId : capabilityOptions ) {
-      UserCapabilityJunction ucj = this.getJunction(x, capId);
-      if ( ucj != null && ucj.getStatus() == CapabilityJunctionStatus.GRANTED ) {
-        satisfied = true;
-        break;
+    try {
+      if ( capabilityOptions.length < 1 ) {
+        Logger logger = (Logger) x.get("logger");
+        logger.warning("crunchService.maybeIntercept() performed with empty list");
+        return;
       }
-    }
 
-    // Throw a capability intercept if none were satisfied
-    if ( ! satisfied ) {
-      CapabilityIntercept ex = new CapabilityIntercept(
-        "Missing a required capability."
-      );
+      // Check that at least one capability option is satisfied
+      boolean satisfied = false;
       for ( String capId : capabilityOptions ) {
-        ex.addCapabilityId(capId);
+        UserCapabilityJunction ucj = this.getJunction(x, capId);
+        if ( ucj != null && ucj.getStatus() == CapabilityJunctionStatus.GRANTED ) {
+          satisfied = true;
+          break;
+        }
       }
-      throw ex;
+
+      // Throw a capability intercept if none were satisfied
+      if ( !satisfied ) {
+        CapabilityIntercept ex = new CapabilityIntercept(
+          "Missing a required capability."
+        );
+        for ( String capId : capabilityOptions ) {
+          ex.addCapabilityId(capId);
+        }
+        throw ex;
+      }
+    } finally {
+      pm.log(x);
     }
   }
 
@@ -614,85 +713,103 @@ public class ServerCrunchService extends ContextAwareSupport implements CrunchSe
   }
 
   public boolean isRenewable_(X x, String capabilityId, boolean firstCall) {
-    DAO capabilityDAO = (DAO) x.get("capabilityDAO");
-    CrunchService crunchService = (CrunchService) x.get("crunchService");
-    Capability capability = (Capability) capabilityDAO.find(capabilityId);
-    UserCapabilityJunction ucj = crunchService.getJunction(x, capabilityId);
+    var pm = PM.create(x, ServerCrunchService.class.getSimpleName(), "isRenewable_");
 
-    if ( ! capability.getEnabled() ) return false;
-    // if topLevel capability.isInternalCapability then returns capRenewability
-    // if a preReq capability.isInternalCapability then that capability renewablity is ignored
-    if ( ! firstCall && capability.getIsInternalCapability() ) return false;
-    if ( ucj != null && ucj.getStatus() == CapabilityJunctionStatus.GRANTED && ucj.getIsRenewable() ) return true;
+    try {
+      DAO capabilityDAO = (DAO) x.get("capabilityDAO");
+      CrunchService crunchService = (CrunchService) x.get("crunchService");
+      Capability capability = (Capability) capabilityDAO.find(capabilityId);
+      UserCapabilityJunction ucj = crunchService.getJunction(x, capabilityId);
 
-    var prereqs = getPrereqs(x, capabilityId, ucj);
-    if ( prereqs != null ) {
-      for ( var capId : prereqs ) {
-        if ( isRenewable_(x, capId.toString(), false)  ) return true;
+      if ( !capability.getEnabled() ) return false;
+      // if topLevel capability.isInternalCapability then returns capRenewability
+      // if a preReq capability.isInternalCapability then that capability renewablity is ignored
+      if ( !firstCall && capability.getIsInternalCapability() ) return false;
+      if ( ucj != null && ucj.getStatus() == CapabilityJunctionStatus.GRANTED && ucj.getIsRenewable() ) return true;
+
+      var prereqs = getPrereqs(x, capabilityId, ucj);
+      if ( prereqs != null ) {
+        for ( var capId : prereqs ) {
+          if ( isRenewable_(x, capId.toString(), false) ) return true;
+        }
       }
+      return false;
+    } finally {
+      pm.log(x);
     }
-    return false;
   }
 
   public void createApprovalRequest(X x, String rootCapability) {
-    var subject = (Subject) x.get("subject");
-    Random r = ThreadLocalRandom.current();
-    var uuid = new UUID(r.nextLong(), r.nextLong()).toString();
-    var ucjReference = (Nary) AND(
-      EQ(UserCapabilityJunction.SOURCE_ID, subject.getRealUser().getId()),
-      EQ(UserCapabilityJunction.TARGET_ID, rootCapability)
-    );
-    if ( subject.getRealUser().getId() != subject.getUser().getId() ) {
-      ucjReference.setArgs(new Predicate[] {
-        ucjReference.getArgs()[0],
-        ucjReference.getArgs()[1],
-        EQ(AgentCapabilityJunction.EFFECTIVE_USER, subject.getUser().getId())
-      });
+    var pm = PM.create(x, ServerCrunchService.class.getSimpleName(), "createApprovalRequest");
+
+    try {
+      var subject = (Subject) x.get("subject");
+      Random r = ThreadLocalRandom.current();
+      var uuid = new UUID(r.nextLong(), r.nextLong()).toString();
+      var ucjReference = (Nary) AND(
+        EQ(UserCapabilityJunction.SOURCE_ID, subject.getRealUser().getId()),
+        EQ(UserCapabilityJunction.TARGET_ID, rootCapability)
+      );
+      if ( subject.getRealUser().getId() != subject.getUser().getId() ) {
+        ucjReference.setArgs(new Predicate[]{
+          ucjReference.getArgs()[0],
+          ucjReference.getArgs()[1],
+          EQ(AgentCapabilityJunction.EFFECTIVE_USER, subject.getUser().getId())
+        });
+      }
+
+      // Replace capability IDs with approvable IDs
+      var i = 0;
+      var approvableIds = new ArrayList<String>();
+      for ( Object capability : getCapabilityPath(x, rootCapability, false, false) ) {
+        var capabilityId = ((Capability) capability).getId();
+        var ucj = getJunction(x, capabilityId);
+        if ( ucj == null ) continue;
+        var approvable = (Approvable) ((DAO) x.get("approvableDAO")).find(EQ(
+          Approvable.OBJ_ID, ucj.getId()
+        ));
+        if ( approvable == null ) continue;
+        approvableIds.add(approvable.getId());
+        i++;
+      }
+
+      var approvable = new UCJUpdateApprovable.Builder(x)
+        .setId(uuid)
+        .setAssociatedTopLevelUCJ(ucjReference)
+        .setApprovableIds(approvableIds.toArray(String[]::new))
+        .build();
+
+      ((DAO) x.get("approvableDAO")).put(approvable);
+
+      var approvalRequest = new ApprovalRequest.Builder(x)
+        .setDaoKey("approvableDAO")
+        .setObjId(uuid)
+        .setOperation(Operation.UPDATE)
+        .setCreatedFor(subject.getUser().getId())
+        // TODO: How can we make this configurable?
+        .setGroup(subject.getUser().getSpid() + "-fraud-ops")
+        .setClassification("update-on-active-ucj")
+        .build();
+
+      ((DAO) x.get("approvalRequestDAO")).put(approvalRequest);
+    } finally {
+      pm.log(x);
     }
-
-    // Replace capability IDs with approvable IDs
-    var i = 0;
-    var approvableIds = new ArrayList<String>();
-    for ( Object capability : getCapabilityPath(x, rootCapability, false, false) ) {
-      var capabilityId = ((Capability) capability).getId();
-      var ucj = getJunction(x, capabilityId);
-      if ( ucj == null ) continue;
-      var approvable = (Approvable) ((DAO) x.get("approvableDAO")).find(EQ(
-        Approvable.OBJ_ID, ucj.getId()
-      ));
-      if ( approvable == null ) continue;
-      approvableIds.add(approvable.getId());
-      i++;
-    }
-
-    var approvable = new UCJUpdateApprovable.Builder(x)
-      .setId(uuid)
-      .setAssociatedTopLevelUCJ(ucjReference)
-      .setApprovableIds(approvableIds.toArray(String[]::new))
-      .build();
-
-    ((DAO) x.get("approvableDAO")).put(approvable);
-
-    var approvalRequest = new ApprovalRequest.Builder(x)
-      .setDaoKey("approvableDAO")
-      .setObjId(uuid)
-      .setOperation(Operation.UPDATE)
-      .setCreatedFor(subject.getUser().getId())
-      // TODO: How can we make this configurable?
-      .setGroup(subject.getUser().getSpid() + "-fraud-ops")
-      .setClassification("update-on-active-ucj")
-      .build();
-
-    ((DAO) x.get("approvalRequestDAO")).put(approvalRequest);
   }
 
   public boolean maybeReopen(X x, String capabilityId) {
-    DAO capabilityDAO = (DAO) x.get("capabilityDAO");
-    CrunchService crunchService = (CrunchService) x.get("crunchService");
+    var pm = PM.create(x, ServerCrunchService.class.getSimpleName(), "maybeReopen");
 
-    Capability capability = (Capability) capabilityDAO.find(capabilityId);
-    UserCapabilityJunction ucj = crunchService.getJunction(x, capabilityId);
-    return capability.maybeReopen(x, ucj);
+    try {
+      DAO capabilityDAO = (DAO) x.get("capabilityDAO");
+      CrunchService crunchService = (CrunchService) x.get("crunchService");
+
+      Capability capability = (Capability) capabilityDAO.find(capabilityId);
+      UserCapabilityJunction ucj = crunchService.getJunction(x, capabilityId);
+      return capability.maybeReopen(x, ucj);
+    } finally {
+      pm.log(x);
+    }
   }
 
   public WizardState getWizardState(X x, String capabilityId) {
@@ -701,118 +818,135 @@ public class ServerCrunchService extends ContextAwareSupport implements CrunchSe
   }
 
   private WizardState getWizardStateFor_(X x, Subject s, String capabilityId) {
-    var wizardStateDAO = (DAO) x.get("wizardStateDAO");
+    var pm = PM.create(x, ServerCrunchService.class.getSimpleName(), "getWizardStateFor_");
 
-    var wizardState = new WizardState.Builder(x)
-      .setRealUser(s.getRealUser().getId())
-      .setEffectiveUser(s.getUser().getId())
-      .setCapability(capabilityId)
-      .build();
+    try {
+      var wizardStateDAO = (DAO) x.get("wizardStateDAO");
 
-    var wizardStateFind = wizardStateDAO.find(wizardState);
+      var wizardState = new WizardState.Builder(x)
+        .setRealUser(s.getRealUser().getId())
+        .setEffectiveUser(s.getUser().getId())
+        .setCapability(capabilityId)
+        .build();
 
-    if ( wizardStateFind != null ) return (WizardState) wizardStateFind;
+      var wizardStateFind = wizardStateDAO.find(wizardState);
 
-    wizardState.setIgnoreList(getGrantedFor_(x, s, capabilityId));
-    wizardStateDAO.put(wizardState);
-    return wizardState;
+      if ( wizardStateFind != null ) return (WizardState) wizardStateFind;
+
+      wizardState.setIgnoreList(getGrantedFor_(x, s, capabilityId));
+      wizardStateDAO.put(wizardState);
+      return wizardState;
+    } finally {
+      pm.log(x);
+    }
   }
 
   private String[] getGrantedFor_(X x, Subject s, String capabilityId) {
-    x = x.put("subject", s);
-    var capsOrLists = getCapabilityPath(x, capabilityId, false, true);
-    var granted = (List<String>) new ArrayList<String>();
+    var pm = PM.create(x, ServerCrunchService.class.getSimpleName(), "getGrantedFor_");
 
-    var grantedStatuses = new CapabilityJunctionStatus[] {
-      CapabilityJunctionStatus.GRANTED,
-      CapabilityJunctionStatus.PENDING,
-      CapabilityJunctionStatus.APPROVED,
-    };
+    try {
+      x = x.put("subject", s);
+      var capsOrLists = getCapabilityPath(x, capabilityId, false, true);
+      var granted = (List<String>) new ArrayList<String>();
 
-    for ( Object obj : capsOrLists ) {
-      Capability cap;
-      boolean isPrereqAware = false;
-      if ( obj instanceof List ) {
-        isPrereqAware = true;
-        var list = (List) obj;
-        cap = (Capability) list.get(list.size() - 1);
-      } else {
-        cap = (Capability) obj;
-      }
+      var grantedStatuses = new CapabilityJunctionStatus[]{
+        CapabilityJunctionStatus.GRANTED,
+        CapabilityJunctionStatus.PENDING,
+        CapabilityJunctionStatus.APPROVED,
+      };
 
-      try {
-        var ucj = getJunction(x, cap.getId());
-        if ( IN(UserCapabilityJunction.STATUS, grantedStatuses).f(ucj) ) {
-          // if a minmax capability is in GRANTED status, its prerequisites should also be added
-          // as a part of granted list, so the wizrd will know to ignore the prerequisites
-          if ( isPrereqAware ) {
-            for ( var c : (List) obj ) {
-              granted.add(((Capability) c).getId());
-            }
-          }
-          else granted.add(cap.getId());
+      for ( Object obj : capsOrLists ) {
+        Capability cap;
+        boolean isPrereqAware = false;
+        if ( obj instanceof List ) {
+          isPrereqAware = true;
+          var list = (List) obj;
+          cap = (Capability) list.get(list.size() - 1);
+        } else {
+          cap = (Capability) obj;
         }
-      } catch ( RuntimeException e ) {
-        // This happens if getJunction was called with an unavailabile
-        // capability, which is fine here.
-      }
-    }
 
-    return granted.toArray(new String[0]);
+        try {
+          var ucj = getJunction(x, cap.getId());
+          if ( IN(UserCapabilityJunction.STATUS, grantedStatuses).f(ucj) ) {
+            // if a minmax capability is in GRANTED status, its prerequisites should also be added
+            // as a part of granted list, so the wizrd will know to ignore the prerequisites
+            if ( isPrereqAware ) {
+              for ( var c : (List) obj ) {
+                granted.add(((Capability) c).getId());
+              }
+            } else granted.add(cap.getId());
+          }
+        } catch ( RuntimeException e ) {
+          // This happens if getJunction was called with an unavailabile
+          // capability, which is fine here.
+        }
+      }
+
+      return granted.toArray(new String[0]);
+    } finally {
+      pm.log(x);
+    }
   }
 
   private Predicate getAssociationPredicate_(X x, String capabilityId) {
-    Subject subject = (Subject) x.get("subject");
+    var pm = PM.create(x, ServerCrunchService.class.getSimpleName(), "getAssociationPredicate_");
 
-    User user = subject.getUser();
-    User realUser = subject.getRealUser();
+    try {
+      Subject subject = (Subject) x.get("subject");
 
-    Predicate acjPredicate = INSTANCE_OF(AgentCapabilityJunction.class);
+      User user = subject.getUser();
+      User realUser = subject.getRealUser();
 
-    // default search result - however updates need to be more specific
-    Predicate result = OR(
-      AND(
-        NOT(acjPredicate),
-        ( user != realUser )
-          // Check if a ucj implies the subject.user has this permission
-          ? OR(
-              EQ(UserCapabilityJunction.SOURCE_ID, realUser.getId()),
-              EQ(UserCapabilityJunction.SOURCE_ID, user.getId())
-            )
-          // Check if a ucj implies the subject.realUser has this permission
-          : EQ(UserCapabilityJunction.SOURCE_ID, realUser.getId())
-      ),
-      AND(
-        acjPredicate,
-        // Check if a ucj implies the subject.realUser has this permission in relation to the user
-        EQ(UserCapabilityJunction.SOURCE_ID, realUser.getId()),
-        EQ(AgentCapabilityJunction.EFFECTIVE_USER, user.getId())
-      )
-    );
-    // Consider the capability that is being referenced,
-    // and assign correct predicate
-    if ( capabilityId != null ) {
-      DAO capabilityDAO = (DAO) x.get("capabilityDAO");
-      Capability cap = (Capability) capabilityDAO.inX(x).find(capabilityId);
-      if ( cap == null ) {
-        throw new RuntimeException(String.format(
-          "Attempting a UCJ find and asked Capability, not found - Capid: %s, subject.user(ucj.effectiveUser): %s, subject.realUser(ucj.sourceId): %s",
-          capabilityId, user.getId(), realUser.getId()
-        ));
-      }
-      if ( cap.getAssociatedEntity() == AssociatedEntity.USER )
-          return EQ(UserCapabilityJunction.SOURCE_ID, user.getId());
-      if ( cap.getAssociatedEntity() == AssociatedEntity.REAL_USER )
-          return EQ(UserCapabilityJunction.SOURCE_ID, realUser.getId());
-      if ( cap.getAssociatedEntity() == AssociatedEntity.ACTING_USER )
-        return AND(
+      Predicate acjPredicate = INSTANCE_OF(AgentCapabilityJunction.class);
+
+      // default search result - however updates need to be more specific
+      Predicate result = OR(
+        AND(
+          NOT(acjPredicate),
+          (user != realUser)
+            // Check if a ucj implies the subject.user has this permission
+            ? OR(
+            EQ(UserCapabilityJunction.SOURCE_ID, realUser.getId()),
+            EQ(UserCapabilityJunction.SOURCE_ID, user.getId())
+          )
+            // Check if a ucj implies the subject.realUser has this permission
+            : EQ(UserCapabilityJunction.SOURCE_ID, realUser.getId())
+        ),
+        AND(
           acjPredicate,
           // Check if a ucj implies the subject.realUser has this permission in relation to the user
           EQ(UserCapabilityJunction.SOURCE_ID, realUser.getId()),
           EQ(AgentCapabilityJunction.EFFECTIVE_USER, user.getId())
-        );
+        )
+      );
+      // Consider the capability that is being referenced,
+      // and assign correct predicate
+      if ( capabilityId != null ) {
+        DAO capabilityDAO = (DAO) x.get("capabilityDAO");
+        Capability cap = (Capability) capabilityDAO.inX(x).find(capabilityId);
+        if ( cap == null ) {
+          throw new RuntimeException(String.format(
+            "Attempting a UCJ find and asked Capability, not found - Capid: %s, subject.user(ucj.effectiveUser): %s, subject.realUser(ucj.sourceId): %s",
+            capabilityId, user.getId(), realUser.getId()
+          ));
+        }
+        if ( cap.getAssociatedEntity() == AssociatedEntity.USER )
+          return EQ(UserCapabilityJunction.SOURCE_ID, user.getId());
+        if ( cap.getAssociatedEntity() == AssociatedEntity.REAL_USER )
+          return EQ(UserCapabilityJunction.SOURCE_ID, realUser.getId());
+        if ( cap.getAssociatedEntity() == AssociatedEntity.ACTING_USER )
+          return AND(
+            acjPredicate,
+            // Check if a ucj implies the subject.realUser has this permission in relation to the user
+            EQ(UserCapabilityJunction.SOURCE_ID, realUser.getId()),
+            EQ(AgentCapabilityJunction.EFFECTIVE_USER, user.getId())
+          );
       }
-    
-    return result;
+
+      return result;
+    } finally {
+      pm.log(x);
+    }
   }
 }
