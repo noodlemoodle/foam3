@@ -88,6 +88,7 @@ foam.CLASS({
     'foam.nanos.logger.Logger',
     'foam.nanos.logger.Loggers',
     'java.util.ArrayList',
+    'java.util.Arrays',
     'java.util.List'
   ],
 
@@ -242,7 +243,7 @@ foam.CLASS({
               logger.warning(getName(), "Index not added. Property not found. spid");
             }
           } else {
-            // NOTE: this is expected on non-local DAO.
+            // NOTE: this is expected on non-local DAOs.
             logger.debug(getName(), "Index not added on spid, no access to MDAO");
           }
         }
@@ -1143,7 +1144,7 @@ model from which to test ServiceProvider ID (spid)`,
         if ( result == null ||
             ! ( result instanceof Boolean ) ||
             ((Boolean) result).booleanValue() != true ) {
-          ((Logger) getX().get("logger")).warning(getName(), "Index not added, no access to MDAO");
+          ((Logger) getX().get("logger")).warning(getName(), "Index not added, no access to MDAO", Arrays.toString(props));
         }
         return this;
       `
