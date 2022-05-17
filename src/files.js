@@ -273,6 +273,7 @@ FOAM_FILES([
   { name: "foam/swift/refines/Predicate", flags: ['swift'] },
   { name: "foam/swift/refines/AbstractDAO", flags: ['swift'] },
   { name: "foam/mlang/LabeledValue" },
+  { name: "foam/dao/index/AddIndexCommand", flags: ['java'] },
   { name: "foam/dao/index/Plan" },
   { name: "foam/dao/index/Index" },
   { name: "foam/dao/index/ProxyIndex" },
