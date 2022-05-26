@@ -215,6 +215,7 @@ var classes = [
   'foam.dao.EasyDAO',
   'foam.dao.EnabledAwareDAO',
   'foam.dao.EnabledAwareDAOTest',
+  'foam.dao.index.AddIndexCommand',
   'foam.dao.index.PersistedIndexTest',
   'foam.dao.SessionClientDAO',
   'foam.dao.SequenceNumberDAO',

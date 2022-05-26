@@ -35,6 +35,7 @@
     'foam.nanos.auth.Subject',
     'foam.nanos.dao.Operation',
     'foam.nanos.logger.Logger',
+    'foam.nanos.pm.PM',
     'java.util.Collection',
     'java.util.Date'
   ],
@@ -154,7 +155,8 @@
       of: 'foam.nanos.ruler.RuleAction',
       name: 'action',
       view: { class: 'foam.u2.view.JSONTextView' },
-      documentation: 'The action to be executed if predicates returns true for passed object.'
+      documentation: 'The action to be executed if predicates returns true for passed object.',
+      javaCloneProperty: 'set(dest, get(source));'
     },
     {
       name: 'enabled',
@@ -372,7 +374,12 @@
         }
       ],
       javaCode: `
-        getAction().applyAction(x, obj, oldObj, ruler, rule, agency);
+        PM pm = PM.create(x, this.getClass(), getId());
+        try {
+          getAction().applyAction(x, obj, oldObj, ruler, rule, agency);
+        } finally {
+          pm.log(x);
+        }
         try {
           ruler.saveHistory(this, obj);
         } catch ( Exception e ) { /* Ignored */ }
