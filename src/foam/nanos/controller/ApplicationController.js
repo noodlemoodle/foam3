@@ -99,7 +99,8 @@ foam.CLASS({
     'theme',
     'user',
     'webApp',
-    'wrapCSS as installCSS'
+    'wrapCSS as installCSS',
+    'buildingStack'
   ],
 
   topics: [
@@ -364,6 +365,11 @@ foam.CLASS({
           this.pushMenu(n);
         }
       }
+    },
+    {
+      class: 'Boolean',
+      name: 'buildingStack',
+      documentation: 'when set to true, memento tails are not cleared when pushing menus'
     },
     'currentMenu',
     'lastMenuLaunched',
@@ -712,7 +718,7 @@ foam.CLASS({
       var dao;
       if ( this.client ) {
         this.pushMenu_(realMenu, menu, opt_forceReload);
-      } else {
+     } else {
         await this.clientPromise.then(async () => {
           await this.pushMenu_(realMenu, menu, opt_forceReload);
         });
