@@ -719,7 +719,7 @@ foam.CLASS({
       if ( this.client ) {
         this.pushMenu_(realMenu, menu, opt_forceReload);
      } else {
-        await this.clientPromise.then(async () => {
+       await this.clientPromise.then(async () => {
           await this.pushMenu_(realMenu, menu, opt_forceReload);
         });
       }
