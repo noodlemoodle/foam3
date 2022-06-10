@@ -230,6 +230,11 @@ foam.CLASS({
       this.SUPER();
       var self = this;
 
+      if ( true ) {
+        this.pushMenu('smte-view');
+        return;
+      }
+
       this.document.addEventListener('keyup', this.onKeyPressed);
       this.onDetach(() => {
         this.document.removeEventListener('keyup', this.onKeyPressed);
