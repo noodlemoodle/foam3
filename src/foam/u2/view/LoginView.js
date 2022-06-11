@@ -38,6 +38,7 @@ foam.CLASS({
     'appConfig',
     'loginVariables',
     'memento',
+    'pushMenu',
     'stack',
     'theme',
     'displayWidth?',
