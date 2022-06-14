@@ -112,8 +112,6 @@ foam.CLASS({
               view: { class: 'foam.nanos.auth.ResendVerificationEmail' }
             }));
           } else {
-            if ( ! this.memento_ || this.memento_.str.length === 0 || this.currentMenu?.id == this.memento_.str )
-              this.pushMenu('');
             this.loginSuccess = !! this.subject;
           }
         }
