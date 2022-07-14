@@ -440,7 +440,7 @@ configuration for contacting the primary node.`,
       type: 'Integer',
       javaCode: `
       int quorum = (int) Math.floor((getNodeCount() / getNodeGroups()) / 2) + 1;
-      getLogger().info("nodeQuorum", "nodes", getNodeCount(), "buckets", getNodeGroups(), "quorum", quorum);
+      // getLogger().info("nodeQuorum", "nodes", getNodeCount(), "buckets", getNodeGroups(), "quorum", quorum);
       return quorum;
       `
     },
