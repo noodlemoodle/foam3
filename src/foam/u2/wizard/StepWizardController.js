@@ -78,6 +78,7 @@ foam.CLASS({
         });
       },
       preSet: function(_, n){
+        this.wizardlets[n.wizardletIndex].load()
         // REVIEW: hotfix for preventing top level wizardlet data reset
         // this.wizardlets[n.wizardletIndex].load()
         return n;
@@ -340,8 +341,8 @@ foam.CLASS({
           name: foam.String.constantize(
               this.wizardlets[i].title || this.wizardlets[i].id ||
               (this.wizardlets[i].of?.name ?? 'UNKNOWN')
-            ) + '_COMPLETE', 
-          tags: ['wizard'] 
+            ) + '_COMPLETE',
+          tags: ['wizard']
         })
         if ( (i + 1) < end && this.wizardlets[i + 1] ) await this.wizardlets[i + 1].load();
       }
