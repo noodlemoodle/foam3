@@ -298,7 +298,7 @@ public interface FObject
 
   default FObject copyFrom(FObject obj) {
     List<PropertyInfo> props = getClassInfo().getAxiomsByClass(PropertyInfo.class);
-    PropertyInfo p2;
+    PropertyInfo p2 = null;
     for ( PropertyInfo p : props ) {
       try {
         if ( getClass() == obj.getClass() ) {
