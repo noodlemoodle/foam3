@@ -64,14 +64,14 @@ foam.CLASS({
       var key  = [sink, skip, limit, order, predicate].toString();
 
       if ( this.cache[key] ) {
-        console.log('************************ CACHED: ', key);
+        // console.log('************************ CACHED: ', key);
         return Promise.resolve(this.cache[key]);
       }
 
       return new Promise(function (resolve, reject) {
         self.delegate.select_(x, sink, skip, limit, order, predicate).then(function(s) {
           self.cache[key] = s;
-          console.log('************************ CACHING: ', key);
+//          console.log('************************ CACHING: ', key);
           // TODO: check if cache is > maxCacheSize and remove oldest entry if it is
           self.purgeCache();
           resolve(s);
