@@ -291,14 +291,11 @@ foam.CLASS({
     },
 
     function getLabelWithCount(option) {
-      let value = 0;
       if ( ! this.countByContents[option] ) {
         console.error('String mismatch: ', option);
       } else {
-        value = this.countByContents[option].value;
-        if ( value > 1 ) {
-          return `[${this.countByContents[option].value}] ${option ? option : this.LABEL_EMPTY}`;
-        }
+        let value = this.countByContents[option].value;
+        if ( value > 1 ) return `[${this.countByContents[option].value}] ${option ? option : this.LABEL_EMPTY}`;
       }
       return option;
     },
