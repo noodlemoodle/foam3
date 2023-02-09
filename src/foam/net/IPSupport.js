@@ -72,6 +72,7 @@ foam.CLASS({
       int offset = 0;
 
       Logger logger = (Logger) x.get("logger");
+      logger.warning("XForwardedFor: Remote IP = " + remoteHostIP);
 
       DAO xDAO = (DAO) x.get("xForwardedForConfigDAO");
       XForwardedForConfig config = null;
