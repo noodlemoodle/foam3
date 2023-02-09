@@ -45,10 +45,18 @@ foam.CLASS({
         logger.warning("XForwardedFor: Header = " + forwardedForHeader);
 
         String[] addresses = forwardedForHeader.split(",");
-        int indexOffset = getXForwardedForIndexOffset(x, req.getRemoteHost());
-        logger.warning("XForwardedFor: Index Offset = " + indexOffset);
         logger.warning("XForwardedFor: Array Length = " + addresses.length);
-        String address = addresses[addresses.length - indexOffset].trim(); // counting back from right most IP in list
+
+        // Take last address in the list and check for x-forwarded-for config based on ip
+        String address = addresses[addresses.length - 1].trim();
+
+        int indexOffset = getXForwardedForIndexOffset(x, address);
+        logger.warning("XForwardedFor: Index Offset = " + indexOffset);
+        if ( indexOffset > 1 ) {
+          // counting back from right most IP in list
+          address = addresses[addresses.length - indexOffset].trim();
+        }
+
         logger.warning("XForwardedFor: Address = " + address);
         return address;
       }
@@ -64,7 +72,7 @@ foam.CLASS({
           type: 'Context'
         },
         {
-          name: 'remoteHostIP',
+          name: 'lookupIP',
           type: 'String'
         }
       ],
@@ -73,11 +81,11 @@ foam.CLASS({
       int offset = 0;
 
       Logger logger = (Logger) x.get("logger");
-      logger.warning("XForwardedFor: Remote IP = " + remoteHostIP);
+      logger.warning("XForwardedFor: Lookup IP = " + lookupIP);
 
       DAO xDAO = (DAO) x.get("xForwardedForConfigDAO");
       XForwardedForConfig config = null;
-      String subnetCheck = remoteHostIP;
+      String subnetCheck = lookupIP;
 
       if ( xDAO != null ) {
         // Check for ip match small subnet range to largest
