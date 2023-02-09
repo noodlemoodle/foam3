@@ -12,6 +12,7 @@ foam.CLASS({
 
   javaImports: [
     'foam.dao.DAO',
+    'foam.nanos.logger.Logger',
     'java.net.InetAddress',
     'javax.servlet.http.HttpServletRequest'
   ],
@@ -40,9 +41,15 @@ foam.CLASS({
       }
       String forwardedForHeader = req.getHeader("X-Forwarded-For");
       if ( ! foam.util.SafetyUtil.isEmpty(forwardedForHeader) ) {
+        Logger logger = (Logger) x.get("logger");
+        logger.warning("XForwardedFor: Header = " + forwardedForHeader);
+
         String[] addresses = forwardedForHeader.split(",");
         int indexOffset = getXForwardedForIndexOffset(x, req.getRemoteHost());
-        return addresses[addresses.length - indexOffset].trim(); // counting back from right most IP in list
+        logger.warning("XForwardedFor: Index Offset = " + indexOffset);
+        String address = addresses[addresses.length - indexOffset].trim(); // counting back from right most IP in list
+        logger.warning("XForwardedFor: Address = " + address);
+        return address;
       }
 
       return req.getRemoteHost();
@@ -64,6 +71,8 @@ foam.CLASS({
       javaCode: `
       int offset = 0;
 
+      Logger logger = (Logger) x.get("logger");
+
       DAO xDAO = (DAO) x.get("xForwardedForConfigDAO");
       XForwardedForConfig config = null;
       String subnetCheck = remoteHostIP;
@@ -73,6 +82,7 @@ foam.CLASS({
         while (subnetCheck.indexOf(".") > 0 ) {
           config = (XForwardedForConfig) xDAO.find(subnetCheck);
           if ( config != null ) {
+            logger.warning("XForwardedFor: Found Config = " + subnetCheck);
             offset = config.getIndexOffset();
             break;
           }
