@@ -47,6 +47,7 @@ foam.CLASS({
         String[] addresses = forwardedForHeader.split(",");
         int indexOffset = getXForwardedForIndexOffset(x, req.getRemoteHost());
         logger.warning("XForwardedFor: Index Offset = " + indexOffset);
+        logger.warning("XForwardedFor: Array Length = " + addresses.length);
         String address = addresses[addresses.length - indexOffset].trim(); // counting back from right most IP in list
         logger.warning("XForwardedFor: Address = " + address);
         return address;
@@ -91,6 +92,8 @@ foam.CLASS({
           subnetCheck = subnetCheck.substring(0, subnetCheck.lastIndexOf("."));
         }
       }
+
+      logger.warning("XForwardedFor: Internal Offset = " + offset);
 
       // Return value must be >= 1 as we are subtracting from array length (array.length - indexOffset)
       // Last in list would be 1 + offset of 0 (default)
