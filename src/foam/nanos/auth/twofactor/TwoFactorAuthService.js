@@ -36,7 +36,7 @@ foam.CLASS({
       name: 'check',
       javaCode: `
         if ( x == null || permission == null ) {
-          StdoutLogger.instance().debug(getClass().getSimpleName() + ".check",
+          StdoutLogger.instance().debug(getClass().getSimpleName(), "check",
             "x or permission not provided", permission);
           return false;
         }

@@ -73,7 +73,7 @@ public class CachingAuthService extends ProxyAuthService implements NanoService,
   @Override
   public boolean check(foam.core.X x, String permission) {
     if ( x == null || permission == null ) {
-      StdoutLogger.instance().debug(getClass().getSimpleName() + ".check", "x or permission not provided", permission);
+      StdoutLogger.instance().debug(getClass().getSimpleName(), "check", "x or permission not provided", permission);
       return false;
     }
 

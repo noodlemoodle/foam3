@@ -105,7 +105,7 @@ foam.CLASS({
         PM pm = PM.create(getX(), this.getClass(), "check");
         try {
           if ( x == null || permission == null ) {
-            StdoutLogger.instance().debug(getClass().getSimpleName() + ".check", "x or permission not provided", permission);
+            StdoutLogger.instance().debug(getClass().getSimpleName(), "check", "x or permission not provided", permission);
             return false;
           }
 
@@ -192,7 +192,7 @@ foam.CLASS({
       `,
       javaCode: `
         if ( x == null || permission == null ) {
-          StdoutLogger.instance().debug(getClass().getSimpleName() + ".capabilityCheck",
+          StdoutLogger.instance().debug(getClass().getSimpleName(), "capabilityCheck",
             "x or permission not provided", permission);
           return false;
         }
