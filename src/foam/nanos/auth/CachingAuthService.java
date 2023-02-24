@@ -84,12 +84,13 @@ public class CachingAuthService extends ProxyAuthService implements NanoService,
 
     Logger logger = Loggers.logger(x, this);
 
-    if ( map.containsKey(p.getName()) ) {
-      logger.debug("Found cached permission check result", user, p.getName(), map.get(p.getName()));
+    Boolean permissionCheck = map.get(p.getName());
+    if ( permissionCheck != null ) {
+      logger.debug("Found cached permission check result", user, p.getName(), permissionCheck);
       return map.get(p.getName());
     }
 
-    boolean permissionCheck = getDelegate().check(x, permission);
+    permissionCheck = getDelegate().check(x, permission);
 
     map.put(p.getName(), permissionCheck);
     logger.debug("Cached permission check result", user, p.getName(), permissionCheck);
