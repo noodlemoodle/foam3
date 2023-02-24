@@ -39,6 +39,8 @@ foam.CLASS({
     'foam.nanos.auth.Subject',
     'foam.nanos.auth.User',
     'foam.nanos.logger.Logger',
+    'foam.nanos.logger.Loggers',
+    'foam.nanos.logger.StdoutLogger',
     'foam.nanos.notification.Notification',
     'foam.nanos.session.Session',
     'foam.nanos.theme.Theme',
@@ -252,7 +254,14 @@ foam.CLASS({
       documentation: `Check if the user in the context supplied has the right
         permission.`,
       javaCode: `
-        if ( x == null || permission == null ) return false;
+        if ( x == null || permission == null ) {
+          StdoutLogger.instance().debug(getClass().getSimpleName() + ".check",
+            "x or permission not provided", permission);
+          return false;
+        }
+
+        Logger logger = Loggers.logger(x, this);
+
         Permission p = new AuthPermission(permission);
         try {
           Group group = getCurrentGroup(x);
@@ -263,10 +272,12 @@ foam.CLASS({
             group = (Group) ((DAO) getLocalGroupDAO()).find(group.getParent());
           }
         } catch (IllegalArgumentException e) {
-          Logger logger = (Logger) x.get("logger");
           logger.error("check", p, e);
         } catch (Throwable t) {
         }
+
+        logger.debug("User in the context does not have the permission", x.get("subject"), getCurrentGroup(x), permission);
+
         return false;
       `
     },

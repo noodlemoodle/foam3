@@ -12,6 +12,9 @@ import foam.core.X;
 import foam.dao.DAO;
 import foam.dao.Sink;
 import foam.nanos.crunch.UserCapabilityJunction;
+import foam.nanos.logger.Logger;
+import foam.nanos.logger.Loggers;
+import foam.nanos.logger.StdoutLogger;
 import foam.nanos.NanoService;
 import foam.util.LRULinkedHashMap;
 import java.security.Permission;
@@ -69,18 +72,27 @@ public class CachingAuthService extends ProxyAuthService implements NanoService,
 
   @Override
   public boolean check(foam.core.X x, String permission) {
-    if ( x == null || permission == null ) return false;
+    if ( x == null || permission == null ) {
+      StdoutLogger.instance().debug(getClass().getSimpleName() + ".check", "x or permission not provided", permission);
+      return false;
+    }
 
     Permission p = new AuthPermission(permission);
 
     User user = getUserFromContext(x);
     Map<String, Boolean> map = getPermissionMap(user);
 
-    if ( map.containsKey(p.getName()) ) return map.get(p.getName());
+    Logger logger = Loggers.logger(x, this);
+
+    if ( map.containsKey(p.getName()) ) {
+      logger.debug("Found cached permission check result", user, p.getName(), map.get(p.getName()));
+      return map.get(p.getName());
+    }
 
     boolean permissionCheck = getDelegate().check(x, permission);
 
     map.put(p.getName(), permissionCheck);
+    logger.debug("Cached permission check result", user, p.getName(), permissionCheck);
 
     return permissionCheck;
   }
@@ -105,6 +117,10 @@ public class CachingAuthService extends ProxyAuthService implements NanoService,
     // Configure listeners for explicit permission DAOs
     DAO userDAO = (DAO) getX().get("localUserDAO");
     if ( userDAO != null ) userDAO.listen(purgeSink, TRUE);
+
+    // Capability.permissionsGranted could change check() outcome.
+    DAO capabilityDAO = (DAO) getX().get("capabilityDAO");
+    if ( capabilityDAO != null ) capabilityDAO.listen(purgeSink, TRUE);
 
     DAO userCapabilityJunctionDAO = (DAO) getX().get("userCapabilityJunctionDAO");
     if ( userCapabilityJunctionDAO != null ) userCapabilityJunctionDAO.listen(purgeSink, TRUE);
