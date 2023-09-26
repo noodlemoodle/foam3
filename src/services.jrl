@@ -170,6 +170,7 @@ p({
       .setFuid(true)
       .setJournalType(foam.dao.JournalType.SINGLE_JOURNAL)
       .setJournalName("users")
+      .setPermissioned(false)
       .build();
   """
 })
