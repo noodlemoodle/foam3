@@ -379,7 +379,6 @@
         var limit = ( this.data && this.data.limit_ ) || undefined;
         return this.data$proxy.select(this.Count.create()).then(s => {
           this.daoCount = limit && limit < s.value ? limit : s.value;
-          this.data$proxy.cmd_(x, foam.dao.DAO.PURGE_CMD);
           this.refresh();
         });
       }
