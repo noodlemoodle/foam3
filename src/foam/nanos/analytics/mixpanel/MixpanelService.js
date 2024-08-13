@@ -53,7 +53,6 @@ foam.CLASS({
         if ( ! isWhitelisted(x, event) ) return;
         String trackingId = event.getSessionId();
         MessageBuilder messageBuilder = new MessageBuilder(getProjectToken());
-        MixpanelAPI mixpanel = new MixpanelAPI();
 
         JSONObject sentEvent = messageBuilder.event(trackingId, event.getName(), props);
 
