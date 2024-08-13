@@ -55,7 +55,6 @@ foam.CLASS({
         MessageBuilder messageBuilder = new MessageBuilder(getProjectToken());
         MixpanelAPI mixpanel = new MixpanelAPI();
 
-        System.out.println(">>>ADDED EVENT: " + event.getName());
         JSONObject sentEvent = messageBuilder.event(trackingId, event.getName(), props);
 
         ClientDelivery delivery = new ClientDelivery();
