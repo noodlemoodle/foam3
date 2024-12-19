@@ -14,3 +14,26 @@ p({
   """,
   enabled: false
 })
+
+p({
+  class:"foam.nanos.cron.Cron",
+  id:"update geolite db cron",
+  description:"update maxmind db",
+  "schedule":{
+    "class":"foam.nanos.cron.CronSchedule",
+    "daysOfMonth":[1]
+  },
+  code:"""
+    config = x.get("maxmindConfig");
+    path = x.get(foam.nanos.fs.FileSystemStorage.class).get(config.getPath());
+    print(path);
+    script = "/tmp/script.sh " + config.getAccountId() + " " + config.getLicenseKey() + " " + path;
+    try {
+      process = Runtime.getRuntime().exec(script);
+      print("done");
+    } catch (Exception e) {
+      print("e:" + e.getMessage());
+    } 
+  """,
+  enabled: true
+})
