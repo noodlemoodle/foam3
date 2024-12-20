@@ -1,6 +1,6 @@
 p({
   class:"foam.nanos.cron.Cron",
-  id:"Update IPGeolocationInfoDAO Cron",
+  id:"UpdateIPGeolocationInfoDAO",
   description:"Update ipgeolocationinfodao with new db info every tuesday and friday",
   "schedule":{
     "class":"foam.nanos.cron.CronSchedule",
@@ -17,8 +17,8 @@ p({
 
 p({
   class:"foam.nanos.cron.Cron",
-  id:"update geolite db cron",
-  description:"update maxmind db",
+  id:"DownloadMaxMindGeoliteDB",
+  description:"Download maxmind geolite database",
   "schedule":{
     "class":"foam.nanos.cron.CronSchedule",
     "daysOfMonth":[1]
@@ -27,13 +27,14 @@ p({
     config = x.get("maxmindConfig");
     path = x.get(foam.nanos.fs.FileSystemStorage.class).get(config.getPath());
     print(path);
-    script = "/tmp/script.sh " + config.getAccountId() + " " + config.getLicenseKey() + " " + path;
+    script = config.getScriptPath() + " " + config.getAccountId() + " " + config.getLicenseKey() + " " + path;
     try {
       process = Runtime.getRuntime().exec(script);
       print("done");
-    } catch (Exception e) {
+    } catch (Throwable e) {
       print("e:" + e.getMessage());
+      throw e;
     } 
   """,
-  enabled: true
+  enabled: false
 })
